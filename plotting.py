@@ -44,8 +44,7 @@ def plot_metric(
             timestamp = row['_timestamp']
             miner_uids = row['miner_uid']
             rewards = row[col_name]
-            
-            # Add or update the rewards for each miner_uid
+
             for miner_uid, reward in zip(miner_uids, rewards):
                 if uids is not None and miner_uid not in uids:
                     continue
