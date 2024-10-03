@@ -38,7 +38,7 @@ def run_simulation(history_df: pd.DataFrame, limit: int):
     progress_bar = tqdm(
         history_df.iterrows(), 
         total=limit,
-        position=mp.current_process()._identity[0],
+        #position=mp.current_process()._identity[0],
         desc="Computing Rewards and Scores")
     
     for i, challenge_row in progress_bar:

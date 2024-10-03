@@ -27,13 +27,14 @@ def plot_metric(
     else:
         plt.figure(figure.number)
 
-    # Create a color map to assign similar colors to the same miner_uids
-    color_map = plt.get_cmap('tab10') 
-    color_map = {uid: color_map(i / len(uids)) for i, uid in enumerate(sorted(uids))}
-    uid_to_color = {
-        'old': color_map,
-        'new': {uid: adjust_lightness(color, .9) for uid, color in color_map.items()}
-    }
+    if map_uids_to_colors:
+        # Create a color map to assign similar colors to the same miner_uids
+        color_map = plt.get_cmap('tab10') 
+        color_map = {uid: color_map(i / len(uids)) for i, uid in enumerate(sorted(uids))}
+        uid_to_color = {
+            'old': color_map,
+            'new': {uid: adjust_lightness(color, .9) for uid, color in color_map.items()}
+        }
 
     for suffix in suffixes:
         col_name = '_'.join([metric, suffix])
@@ -60,7 +61,6 @@ def plot_metric(
                     miner_rewards[miner_uid].append((timestamp, last_reward))
 
         for miner_uid, rewards_data in miner_rewards.items():
-            # Unzip the timestamp-reward pairs into separate lists
             timestamps, rewards = zip(*rewards_data)
             label = f"Miner {miner_uid} [{suffix}]" + ("" if label_suffix is None else f" [{label_suffix}]")
             plt.plot(timestamps, rewards, label=label, color=uid_to_color[suffix][miner_uid] if map_uids_to_colors else None)
