@@ -12,7 +12,7 @@ from weights import set_weights
 
 def run_simulation(history_df: pd.DataFrame, limit: int):
     """
-    Iteratively computes rewards and scores from labels and miner predictions
+    Iteratively computes rewards, scores and weights from labels and miner predictions
 
     Args:
         history_df: DataFrame where each row is a challenge, and contains columns 
