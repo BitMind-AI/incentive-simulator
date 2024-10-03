@@ -70,7 +70,9 @@ def plot_metric(
     plt.xlabel("Timestamp")
     plt.ylabel(metric.capitalize())
     plt.title(f"Miner {metric.capitalize()} Over Time")
-    plt.legend()
+    handles, labels = plt.gca().get_legend_handles_labels()
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
+    plt.legend(handles, labels)
     plt.show();
 
 
@@ -96,5 +98,7 @@ def plot_multi_validator_metric(
     plt.xlabel("Timestamp")
     plt.ylabel(metric.capitalize())
     plt.title(f"Miner {metric.capitalize()} Over Time")
-    plt.legend()
+    handles, labels = plt.gca().get_legend_handles_labels()
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
+    plt.legend(handles, labels)
     plt.show();    
