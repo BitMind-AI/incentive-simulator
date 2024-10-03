@@ -12,15 +12,19 @@ def adjust_lightness(color, factor):
     return colorsys.hls_to_rgb(*adjusted_hls)  # Convert back to RGB
 
 
-
 def plot_metric(
     df, 
     metric='rewards', 
     suffixes=['old', 'new'], 
     uids=None,
-    map_uids_to_colors=True):
-    
-    plt.figure(figsize=(14, 6))
+    map_uids_to_colors=True,
+    figure=None,
+    label_suffix=None):
+
+    if not figure:
+        plt.figure(figsize=(14, 6))
+    else:
+        plt.figure(figure.number)
 
     # Create a color map to assign similar colors to the same miner_uids
     color_map = plt.get_cmap('tab10') 
@@ -57,10 +61,40 @@ def plot_metric(
         for miner_uid, rewards_data in miner_rewards.items():
             # Unzip the timestamp-reward pairs into separate lists
             timestamps, rewards = zip(*rewards_data)
-            plt.plot(timestamps, rewards, label=f"Miner {miner_uid} [{suffix}]", color=uid_to_color[suffix][miner_uid] if map_uids_to_colors else None)
-    
+            label = f"Miner {miner_uid} [{suffix}]" + ("" if label_suffix is None else f" [{label_suffix}]")
+            plt.plot(timestamps, rewards, label=label, color=uid_to_color[suffix][miner_uid] if map_uids_to_colors else None)
+
+    if figure:
+        return plt.gcf()
+
     plt.xlabel("Timestamp")
     plt.ylabel(metric.capitalize())
     plt.title(f"Miner {metric.capitalize()} Over Time")
     plt.legend()
     plt.show();
+
+
+def plot_multi_validator_metric(    
+    vali_dfs, 
+    metric='rewards', 
+    suffixes=['old', 'new'], 
+    uids=None,
+    map_uids_to_colors=True):
+    
+    plt.figure(figsize=(14, 6))
+    fig = plt.gcf()
+    for vali, df in vali_dfs.items():
+        fig = plot_metric(
+            df, 
+            metric=metric,
+            suffixes=suffixes,
+            uids=uids,
+            map_uids_to_colors=map_uids_to_colors,
+            figure=fig,
+            label_suffix=vali)
+
+    plt.xlabel("Timestamp")
+    plt.ylabel(metric.capitalize())
+    plt.title(f"Miner {metric.capitalize()} Over Time")
+    plt.legend()
+    plt.show();    

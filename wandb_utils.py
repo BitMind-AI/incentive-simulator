@@ -15,10 +15,15 @@ def get_wandb_history(
 
     api = wandb.Api()
     validator_runs = api.runs(f"{entity}/{project}")
-    #start_time = "2023-10-01T00:00:00"
 
-    # Query the runs using the created_at filter for runs after the specific time
-    #runs = api.runs(f"{entity}/{project}", filters={"created_at": {"$gte": start_time}})
+    filters = None
+    if start_ts:
+        formatted_time = datetime.fromtimestamp(start_ts).strftime('%Y-%m-%dT%H:%M:%S')
+        filters = {"created_at": {"$gte": formatted_time}}
+
+    wandb_proj = f"{entity}/{project}"
+    print(f"Querying wandb probject {wandb_proj} with filters {filters}")
+    runs = api.runs(wandb_proj, filters=filters)
 
     all_history_df = pd.DataFrame()
     for run in validator_runs:

@@ -61,7 +61,9 @@ def get_rewards(
 
             # Calculate rewards for different time windows
             reward_100 = 1.0 if is_new_miner else sum(0.2 * metrics_100[m] for m in ['accuracy', 'precision', 'recall', 'f1_score', 'mcc'])
-            
+            if reward_100 > 0.9:
+                reward_100 = 1.
+
             reward_10 = (
                 0.2 * metrics_10['accuracy'] +
                 0.2 * metrics_10['precision'] +
@@ -69,11 +71,13 @@ def get_rewards(
                 0.2 * metrics_10['f1_score'] +
                 0.2 * metrics_10['mcc']
             )
-            
+            if reward_10 > 0.9:
+                reward_10 = 1.
+                
             correct = 1. if pred == true_label else 0.
 
             # Calculate final reward: 20% from 10-prediction window, 80% from correctness
-            reward = 0.2 * reward_10 + 0.8 * correct
+            reward = reward_100 * .50 + reward_10 * .25 + correct * .25
             
             # Calculate and apply penalty
             penalty = count_penalty(pred_prob, reward_100)
@@ -103,7 +107,7 @@ def get_rewards(
                 """)
             
         except Exception as e:
-            bt.logging.error(f"Couldn't calculate reward for miner {uid}, prediction: {responses[uid] if uid < len(responses) else 'N/A'}, label: {label}")
+            #bt.logging.error(f"Couldn't calculate reward for miner {uid}, prediction: {responses[uid] if uid < len(responses) else 'N/A'}, label: {label}")
             bt.logging.exception(e)
             miner_rewards.append(0.0)
 
