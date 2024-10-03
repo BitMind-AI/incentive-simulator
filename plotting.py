@@ -19,7 +19,8 @@ def plot_metric(
     uids=None,
     map_uids_to_colors=True,
     figure=None,
-    label_suffix=None):
+    label_suffix=None,
+    legend_loc='best'):
 
     if not figure:
         plt.figure(figsize=(14, 6))
@@ -38,7 +39,7 @@ def plot_metric(
         col_name = '_'.join([metric, suffix])
 
         miner_rewards = {}
-        for _, row in df.iterrows():
+        for i, row in df.iterrows():
             timestamp = row['_timestamp']
             miner_uids = row['miner_uid']
             rewards = row[col_name]
@@ -72,20 +73,24 @@ def plot_metric(
     plt.title(f"Miner {metric.capitalize()} Over Time")
     handles, labels = plt.gca().get_legend_handles_labels()
     labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
-    plt.legend(handles, labels)
+    plt.legend(handles, labels, loc=legend_loc)
     plt.show();
 
 
 def plot_multi_validator_metric(    
     vali_dfs, 
+    idx_range=None,
     metric='rewards', 
     suffixes=['old', 'new'], 
     uids=None,
-    map_uids_to_colors=True):
+    map_uids_to_colors=True,
+    legend_loc='best'):
     
     plt.figure(figsize=(14, 6))
     fig = plt.gcf()
     for vali, df in vali_dfs.items():
+        if idx_range:
+            df = df.iloc[idx_range[0]:idx_range[1]]
         fig = plot_metric(
             df, 
             metric=metric,
@@ -100,5 +105,5 @@ def plot_multi_validator_metric(
     plt.title(f"Miner {metric.capitalize()} Over Time")
     handles, labels = plt.gca().get_legend_handles_labels()
     labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
-    plt.legend(handles, labels)
+    plt.legend(handles, labels, loc=legend_loc)
     plt.show();    
