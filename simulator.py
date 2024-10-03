@@ -1,11 +1,13 @@
 from tqdm import tqdm
 import multiprocessing as mp
+import bittensor as bt
 import pandas as pd
 import numpy as np
 
 from miner_performance_tracker import MinerPerformanceTracker
 from reward import get_rewards, old_get_rewards
 from scoring import update_scores   
+from weights import set_weights
 
 
 def run_simulation(history_df: pd.DataFrame, limit: int):
@@ -25,11 +27,15 @@ def run_simulation(history_df: pd.DataFrame, limit: int):
     """
     perf_tracker = MinerPerformanceTracker()
     
+    metagraph = bt.metagraph(netuid=34)
+    subtensor = bt.subtensor()
+
     miner_sample_size = history_df['miner_uid'].apply(len).unique()[0]
     
     keys = ['old', 'new']
     scores = {k: np.zeros(256, dtype=np.float32) for k in keys}
-    
+
+    weight_history = {k: [] for k in keys}
     score_history = {k: [] for k in keys}
     reward_history = {k: [] for k in keys}
     
@@ -39,7 +45,7 @@ def run_simulation(history_df: pd.DataFrame, limit: int):
         history_df.iterrows(), 
         total=limit,
         #position=mp.current_process()._identity[0],
-        desc="Computing Rewards and Scores")
+        desc="Computing Rewards, Scores and Weights")
     
     for i, challenge_row in progress_bar:
         if i >= limit:
@@ -66,6 +72,9 @@ def run_simulation(history_df: pd.DataFrame, limit: int):
     
         score_history['new'].append(scores['new'])
         score_history['old'].append(scores['old'])
+
+        weight_history['new'].append(set_weights(scores['new'], metagraph, subtensor)[1])
+        weight_history['old'].append(set_weights(scores['old'], metagraph, subtensor)[1])
     
     for k in reward_history:
         diff = len(history_df) - len(reward_history[k])
@@ -78,4 +87,11 @@ def run_simulation(history_df: pd.DataFrame, limit: int):
         if diff != 0:
             score_history[k] += [np.nan] * diff
         history_df['scores_' + k] = score_history[k]
+
+    for k in weight_history:
+        diff = len(history_df) - len(weight_history[k])
+        if diff != 0:
+            weight_history[k] += [np.nan] * diff
+        history_df['weights_' + k] = weight_history[k]
+    
     return history_df
