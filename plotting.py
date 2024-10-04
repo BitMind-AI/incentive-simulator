@@ -1,7 +1,58 @@
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+import seaborn as sns
 import colorsys
+
+
+def plot_incentives(I_dict):
+
+    plt.figure(figsize=(14, 6))
+    fig = plt.gcf()
+
+    cmap = plt.get_cmap('viridis')
+    colors = [cmap(i/len(I_dict)) for i in range(len(I_dict))]
+
+    for i, (name, I) in enumerate(I_dict.items()):
+        fig = plot_incentive(I, fig, colors[i])
+
+    sns.set_style("whitegrid")
+    plt.title("Miner Incentives", fontsize=20, pad=20)
+    plt.xlabel("Miner", fontsize=14, labelpad=10)
+    plt.ylabel("Incentive", fontsize=14, labelpad=10)
+    plt.ylim(0, max(I) * 1.1)
+    plt.xticks(range(0, len(I), 50), list(range(0, len(I), 50)), rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_incentive(I, figure=None, color='#1f77b4'):
+
+    if not figure:
+        plt.figure(figsize=(12, 8))
+    else:
+        plt.figure(figure.number)
+
+    sns.scatterplot(
+        x=range(len(I)),
+        y=sorted(I[I.nonzero()]),
+        s=100,
+        color=color,
+        edgecolor='white',
+        linewidth=0.5
+    )
+
+    if figure:
+        return plt.gcf()
+
+    sns.set_style("whitegrid")
+    plt.title("Miner Incentives", fontsize=20, pad=20)
+    plt.xlabel("Miner", fontsize=14, labelpad=10)
+    plt.ylabel("Incentive", fontsize=14, labelpad=10)
+    plt.ylim(0, max(I) * 1.1)
+    plt.xticks(range(0, len(I), 50), list(range(0, len(I), 50)), rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
 
 
 def adjust_lightness(color, factor):
