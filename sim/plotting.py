@@ -5,6 +5,89 @@ import seaborn as sns
 import colorsys
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.animation import FuncAnimation
+from IPython.display import HTML, display
+from matplotlib.colors import to_rgba
+import bittensor as bt
+
+
+def plot_incentive_over_time(
+    scored_validator_dfs,
+    validator_uids,
+    reward_column='weights_BinaryReward',
+    netuid=34):
+    """
+    TODO option to have a fixed xlim and ylim
+    TODO option to overlay multiple incentives over time
+    """
+
+    def get_new_I(
+        timestep,
+        validator_dfs,
+        validator_uids,
+        reward_column,
+        metagraph=None):
+        """
+        TODO log stake to w&b for dynamic stake values instead
+        of relying on current metagraph
+        """
+        S = assemble_S(validator_uids, metagraph=metagraph)
+        W = assemble_W(validator_dfs, reward_column, idx=timestep)
+        I = compute_incentive(W, S)
+        return np.sort(I[I.nonzero()])
+
+    def update(frame):
+        I = get_new_I(
+            frame,
+            scored_validator_dfs,
+            validator_uids,
+            reward_column,
+            metagraph)
+        y = sorted(I[I.nonzero()])
+        scatter.set_offsets(np.column_stack((range(len(y)), y)))
+        ax.set_ylim(0, max(I) * 1.1)
+        ax.set_xlim(-5, len(I) + 5)
+        ax.set_xticks(range(0, len(I) + 1, 50))
+        ax.set_xticklabels(range(0, len(I), 50), rotation=45, ha='right')
+        ax.set_title(f"Miner Incentives (Timestep: {frame})", fontsize=20, pad=20)
+        return scatter,
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    sns.set_style("whitegrid")
+
+    metagraph = bt.metagraph(netuid=netuid)
+
+    # Initialize with first timestep data
+    I = get_new_I(
+        0,
+        scored_validator_dfs,
+        validator_uids,
+        reward_column,
+        metagraph)
+
+    y = sorted(I[I.nonzero()])
+
+    color = plt.cm.viridis(0.5)
+    scatter = ax.scatter(range(len(y)), y, s=100, color=color, edgecolor='white', linewidth=0.5)
+
+    ax.set_title("Miner Incentives", fontsize=20, pad=20)
+    ax.set_xlabel("Miner", fontsize=14, labelpad=10)
+    ax.set_ylabel("Incentive", fontsize=14, labelpad=10)
+    ax.set_ylim(0, max(I) * 1.1)
+    ax.set_xlim(-5, len(I) + 5)
+    ax.set_xticks(range(0, len(I), 50))
+    ax.set_xticklabels(range(0, len(I), 50), rotation=45, ha='right')
+    plt.tight_layout()
+
+    steps = min([len(df) for vali, df in SCORED_DFS.items()])
+    anim = FuncAnimation(fig, update, frames=steps, interval=200, blit=True)
+    plt.close(fig)
+    display(HTML(anim.to_jshtml()))
+
+
 def plot_incentives(I_dict):
 
     plt.figure(figsize=(14, 6))
