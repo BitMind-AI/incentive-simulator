@@ -1,110 +1,89 @@
 from collections import defaultdict
+from functools import partial
 from tqdm import tqdm
 import multiprocessing as mp
 import bittensor as bt
 import pandas as pd
 import numpy as np
 
-from glicko import GlickoRater
-from miner_performance_tracker import MinerPerformanceTracker
-from reward import get_rewards, old_get_rewards
+from rewards import REWARD_REGISTRY, Reward
 from scoring import update_scores   
 from weights import set_weights
 
 
-def run_simulation(history_df: pd.DataFrame, limit: int):
-    """
-    Iteratively computes rewards, scores and weights from labels and miner predictions
+class Simulator:
 
-    Args:
-        history_df: DataFrame where each row is a challenge, and contains columns 
-            'label', 'pred', and 'miner_uid'
-        limit: Number of rows to iterate over (for debugging or running over smaller windows). 
-            Set to None for all rows
+    def __init__(
+            self,
+            reward_fns=['BinaryReward', 'WeightedHistoryReward'],
+        ):
+        """
+        """
+        self.reward_fns = [REWARD_REGISTRY[fn] for fn in reward_fns]
 
-    Returns:
-        history_df with additional columns 'rewards_new', 'rewards_old', 'scores_new', 'scores_old'
-        Note: if limit is < len(history_df), the first `limit` rows will contain rewards and scores, and 
-        the rest will be nan.
-    """
-    perf_tracker = MinerPerformanceTracker()
-    glicko = GlickoRater()
-    v_history = defaultdict(list)
-    rd_history = defaultdict(list)
-    
-    metagraph = bt.metagraph(netuid=34)
-    subtensor = bt.subtensor()
+    def run(self, history_df: pd.DataFrame):
+        with mp.Pool(mp.cpu_count()) as pool:
+            result_dfs = pool.map(
+                partial(self._run_sim, history_df=history_df),
+                self.reward_fns)
 
-    miner_sample_size = history_df['miner_uid'].apply(len).unique()[0]
+        for reward, result_df in zip(self.reward_fns, result_dfs):
+            cols = [
+                '_'.join([col, reward.name])
+                for col  in ['rewards', 'scores', 'weights']
+            ]
+            history_df[cols] = result_df[cols]
+        return history_df
 
-    keys = ['old', 'new']
-    scores = {k: np.zeros(256, dtype=np.float32) for k in keys}
 
-    weight_history = {k: [] for k in keys}
-    score_history = {k: [] for k in keys}
-    reward_history = {k: [] for k in keys}
+    def _run_sim(self, history_df: pd.DataFrame, reward: Reward):
+        """
+        Iteratively computes rewards, scores and weights from labels and miner predictions
 
-    limit = len(history_df) if limit is None else limit
+        Args:
+            history_df: DataFrame where each row is a challenge, and contains columns 
+                'label', 'pred', and 'miner_uid'
+            limit: Number of rows to iterate over (for debugging or running over smaller windows). 
+                Set to None for all rows
 
-    progress_bar = tqdm(
-        history_df.iterrows(), 
-        total=limit,
-        #position=mp.current_process()._identity[0],
-        desc="Computing Rewards, Scores and Weights")
+        Returns:
+            history_df with additional columns 'rewards_new', 'rewards_old', 'scores_new', 'scores_old'
+            Note: if limit is < len(history_df), the first `limit` rows will contain rewards and scores, and 
+            the rest will be nan.
+        """
+        metagraph = bt.metagraph(netuid=34)
+        subtensor = bt.subtensor()
+        scores = np.zeros(256, dtype=np.float32) 
+        history = {
+            'weights': [],
+            'scores': [],
+            'rewards': []
+        }
 
-    for i, challenge_row in progress_bar:
-        if i >= limit:
-            break
+        progress_bar = tqdm(
+            history_df.iterrows(), 
+            total=len(history_df),
+            #position=mp.current_process()._identity[0],
+            desc="Computing Rewards, Scores and Weights")
 
-        label = challenge_row['label']
-        preds = challenge_row['pred']
-        uids = challenge_row['miner_uid']
+        for i, challenge_row in progress_bar:
+            label = challenge_row['label']
+            preds = challenge_row['pred']
+            uids = challenge_row['miner_uid']
 
-        #new_rewards = glicko.update_ratings(uids, preds, label)
-        #for uid in range(257):
-        #    v_history[uid].append(glicko.volatility[uid])
-        #   rd_history[uid].append(glicko.rd[uid])
+            rewards = reward(uids, preds, label)
+            history['rewards'].append(rewards)
+        
+            scores = update_scores(scores, rewards, uids)
+            history['scores'] = scores
 
-        new_rewards = get_rewards(
-            label,
-            preds,
-            uids,
-            [1] * miner_sample_size, # mocking hotkeys for now
-            perf_tracker)
+            new_weight_uids, new_weights = set_weights(scores['new'], metagraph, subtensor)
+            weight_dict = dict(zip(new_weight_uids, new_weights))
+            history['weights'].append(weight_dict)
 
-        old_rewards = old_get_rewards(label, preds)
-    
-        scores['new'] = update_scores(scores['new'], new_rewards, uids)
-        scores['old'] = update_scores(scores['old'], old_rewards, uids)
-    
-        reward_history['new'].append(new_rewards)
-        reward_history['old'].append(old_rewards)
-    
-        score_history['new'].append(scores['new'])
-        score_history['old'].append(scores['old'])
+        history_df[f'rewards_{reward.name}'] = history['rewards']
+        history_df[f'scores_{reward.name}'] = history['scores']
+        history_df[f'weights_{reward.name}'] = history['weights']
 
-        new_weight_uids, new_weights = set_weights(scores['new'], metagraph, subtensor)
-        weight_history['new'].append(dict(zip(new_weight_uids, new_weights)))
-
-        old_weight_uids, old_weights = set_weights(scores['new'], metagraph, subtensor)
-        weight_history['old'].append(dict(zip(old_weight_uids, old_weights)))
-    
-    for k in reward_history:
-        diff = len(history_df) - len(reward_history[k])
-        if diff != 0:
-            reward_history[k] += [np.nan] * diff
-        history_df['rewards_' + k] = reward_history[k]
-
-    for k in score_history:
-        diff = len(history_df) - len(score_history[k])
-        if diff != 0:
-            score_history[k] += [np.nan] * diff
-        history_df['scores_' + k] = score_history[k]
-
-    for k in weight_history:
-        diff = len(history_df) - len(weight_history[k])
-        if diff != 0:
-            weight_history[k] += [np.nan] * diff
-        history_df['weights_' + k] = weight_history[k]
-    
-    return history_df#, rd_history, v_history
+        return history_df
+       
