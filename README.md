@@ -4,7 +4,9 @@ A tool for testing new reward functions by simulating their impact on miner ince
 
 ![Miner Incentives Animation](static/miner_incentives.gif)
 
-This tool is geared towards simulating different reward functions on SN34. The goal is to generalize this repository to be easiliy usable by other subnet owners to facilitate arbitrary validation mechanism simulations. 
+This tool is currently geared towards simulating different reward functions on SN34. 
+
+The goal is to generalize this repository to facilitate arbitrary validation mechanism simulations on historical data from any subnet.
 
 Currently, `simulation.ipynb`...
 - Loads and processes historical validator data from Weights & Biases (W&B) or local cache
