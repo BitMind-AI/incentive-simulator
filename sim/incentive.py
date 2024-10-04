@@ -8,10 +8,10 @@ def compute_incentive(W, S):
     return incentive
 
 
-def assemble_W(data_dict, W_column, N=256):
+def assemble_W(data_dict, W_column, N=256, idx=-1):
     W = []
     for vali, df in data_dict.items():
-        weight_dict = df[W_column].iloc[-1]
+        weight_dict = df[W_column].iloc[idx]
         uids = list(weight_dict.keys())
         W_ = np.zeros(N)
         W_[uids] = [weight_dict[uid] for uid in uids]
