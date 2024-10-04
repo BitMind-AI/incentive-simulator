@@ -2,8 +2,8 @@ from typing import List
 import bittensor as bt
 import numpy as np
 
-from reward import Reward
-from reward_registry import REWARD_REGISTRY
+from .base_reward import Reward
+from .reward_registry import REWARD_REGISTRY
 
 
 @REWARD_REGISTRY.register_module(module_name='BinaryReward')
@@ -19,8 +19,9 @@ class BinaryReward(Reward):
 
     def __call__(
             self,
+            uids,
+            responses,
             label: float,
-            responses: List,
     ) -> np.array:
         """
         Returns a tensor of rewards for the given query and responses.
@@ -37,7 +38,7 @@ class BinaryReward(Reward):
             try:
                 pred = responses[uid]
                 reward = 1. if np.round(pred) == label else 0.
-                reward *= self.penalty(pred, 1.)
+                reward *= self.penalty(pred)
                 miner_rewards.append(reward)
 
             except Exception as e:

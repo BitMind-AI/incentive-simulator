@@ -2,9 +2,9 @@ from typing import List
 import bittensor as bt
 import numpy as np
 
-from reward import Reward
-from utils import MinerPerformanceTracker
-from reward_registry import REWARD_REGISTRY
+from .base_reward import Reward
+from .utils import MinerPerformanceTracker
+from .reward_registry import REWARD_REGISTRY
 
 METRIC_WEIGHTS = {
     'accuracy':  0.2,
@@ -22,10 +22,10 @@ class WeightedHistoryReward(Reward):
 
     def __init__(self, verbose=False):
         super().__init__("WeightedHistoryReward")
-        self.performance_trakcer = MinerPerformanceTracker()
+        self.performance_tracker = MinerPerformanceTracker()
         self.verbose = verbose
 
-    def count_penalty(self, y_pred: float, historical_performance: float) -> float:
+    def penalty(self, y_pred: float, historical_performance: float) -> float:
         # Penalize if prediction is not within [0, 1]
         bad = (y_pred < 0.0) or (y_pred > 1.0)
         low_accuracy = historical_performance < 0.60
@@ -36,7 +36,7 @@ class WeightedHistoryReward(Reward):
         uids: List[int],
         responses: List[float],
         label: float,
-        hotkeys: List[str]
+        hotkeys: List[str] = None
     ) -> np.array:
         """
         Returns an array of rewards for the given label and miner responses.
@@ -51,6 +51,8 @@ class WeightedHistoryReward(Reward):
         Returns:
         - np.array: An array of rewards for the given label and responses.
         """
+        hotkeys = ['mock'] * len(uids) if hotkeys is None else hotkeys
+
         miner_rewards = []
         for uid, miner_hotkey, pred_prob in zip(uids, hotkeys, responses):
             try:            
