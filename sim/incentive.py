@@ -19,7 +19,8 @@ def assemble_W(data_dict, W_column, N=256, idx=-1):
     return np.vstack(W)
 
 
-def assemble_S(vali_uids, netuid=34):
-    mg = bt.metagraph(netuid=34)
-    return mg.S[vali_uids]
+def assemble_S(vali_uids, netuid=34, metagraph=None):
+    if not metagraph:
+        metagraph = bt.metagraph(netuid=netuid)
+    return metagraph.S[vali_uids]
     
