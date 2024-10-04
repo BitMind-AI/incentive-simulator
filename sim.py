@@ -12,7 +12,12 @@ from scoring import update_scores
 from weights import set_weights
 
 
-def run_simulation(history_df: pd.DataFrame, limit: int):
+class Simulator:
+
+    def __init__(self):
+        
+
+    def run(history_df: pd.DataFrame, reward_fn, limit: int):
     """
     Iteratively computes rewards, scores and weights from labels and miner predictions
 
