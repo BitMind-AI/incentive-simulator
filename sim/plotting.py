@@ -34,8 +34,7 @@ def plot_incentive_over_time(
         """
         S = assemble_S(validator_uids, metagraph=metagraph)
         W = assemble_W(validator_dfs, reward_column, idx=timestep)
-        I = compute_incentive(W, S)
-        return np.sort(I[I.nonzero()])
+        return compute_incentive(W, S)
 
     def update(frame):
         I = get_new_I(
@@ -44,14 +43,12 @@ def plot_incentive_over_time(
             validator_uids,
             reward_column,
             metagraph)
-        non_zero_indices = np.nonzero(I)[0]
-        y = I[non_zero_indices]
-        sorted_indices = np.argsort(y)
-        y_sorted = y[sorted_indices]
-        original_indices = non_zero_indices[sorted_indices]
+        
+        sorted_pairs = sorted(zip(I, range(len(I))))
+        y_sorted, sorted_indices = zip(*sorted_pairs)
         
         scatter.set_offsets(np.column_stack((range(len(y_sorted)), y_sorted)))
-        scatter.set_color(color_map[original_indices])
+        scatter.set_color(color_map[np.array(sorted_indices)])
         ax.set_ylim(0, max(I) * 1.1)
         ax.set_xlim(-5, len(y_sorted) + 5)
         ax.set_xticks(range(0, len(y_sorted) + 1, 50))
@@ -72,21 +69,14 @@ def plot_incentive_over_time(
         reward_column,
         metagraph)
 
-    # Create a color map based on the original indices
-    color_map = plt.cm.viridis(np.linspace(0, 1, 257))
+    color_map = plt.cm.viridis(np.linspace(0, 1, 256))
 
-    # Get non-zero indices and values
-    non_zero_indices = np.nonzero(I)[0]
-    y = I[non_zero_indices]
-
-    # Sort y and keep track of original indices
-    sorted_indices = np.argsort(y)
-    y_sorted = y[sorted_indices]
-    original_indices = non_zero_indices[sorted_indices]
-
-    # Use the original indices to assign colors
-    scatter = ax.scatter(range(len(y_sorted)), y_sorted, s=100, c=color_map[original_indices], edgecolor='white', linewidth=0.5)
-
+    sorted_pairs = sorted(zip(I, range(len(I))))
+    y_sorted, sorted_indices = zip(*sorted_pairs)
+    print(len(y_sorted), len(sorted_indices))
+    print(len(color_map))
+    scatter = ax.scatter(range(256), y_sorted, c=color_map[np.array(sorted_indices)], s=50)
+    
     ax.set_title("Miner Incentives", fontsize=20, pad=20)
     ax.set_xlabel("Miner", fontsize=14, labelpad=10)
     ax.set_ylabel("Incentive", fontsize=14, labelpad=10)
@@ -121,7 +111,6 @@ def plot_incentives(I_dict):
     plt.xticks(range(0, len(I), 50), list(range(0, len(I), 50)), rotation=45, ha='right')
     plt.legend(loc='best')
     plt.tight_layout()
-    
     
     plt.show()
 
