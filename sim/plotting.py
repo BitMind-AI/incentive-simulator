@@ -1,17 +1,15 @@
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-import seaborn as sns
-import colorsys
-
-
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from matplotlib.animation import FuncAnimation
 from IPython.display import HTML, display
 from matplotlib.colors import to_rgba
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import bittensor as bt
+import seaborn as sns
+import numpy as np
+import colorsys
+
+from sim.incentive import assemble_W, assemble_S, compute_incentive
 
 
 def plot_incentive_over_time(
@@ -46,12 +44,18 @@ def plot_incentive_over_time(
             validator_uids,
             reward_column,
             metagraph)
-        y = sorted(I[I.nonzero()])
-        scatter.set_offsets(np.column_stack((range(len(y)), y)))
+        non_zero_indices = np.nonzero(I)[0]
+        y = I[non_zero_indices]
+        sorted_indices = np.argsort(y)
+        y_sorted = y[sorted_indices]
+        original_indices = non_zero_indices[sorted_indices]
+        
+        scatter.set_offsets(np.column_stack((range(len(y_sorted)), y_sorted)))
+        scatter.set_color(color_map[original_indices])
         ax.set_ylim(0, max(I) * 1.1)
-        ax.set_xlim(-5, len(I) + 5)
-        ax.set_xticks(range(0, len(I) + 1, 50))
-        ax.set_xticklabels(range(0, len(I), 50), rotation=45, ha='right')
+        ax.set_xlim(-5, len(y_sorted) + 5)
+        ax.set_xticks(range(0, len(y_sorted) + 1, 50))
+        ax.set_xticklabels(range(0, len(y_sorted), 50), rotation=45, ha='right')
         ax.set_title(f"Miner Incentives (Timestep: {frame})", fontsize=20, pad=20)
         return scatter,
 
@@ -68,10 +72,20 @@ def plot_incentive_over_time(
         reward_column,
         metagraph)
 
-    y = sorted(I[I.nonzero()])
+    # Create a color map based on the original indices
+    color_map = plt.cm.viridis(np.linspace(0, 1, 257))
 
-    color = plt.cm.viridis(0.5)
-    scatter = ax.scatter(range(len(y)), y, s=100, color=color, edgecolor='white', linewidth=0.5)
+    # Get non-zero indices and values
+    non_zero_indices = np.nonzero(I)[0]
+    y = I[non_zero_indices]
+
+    # Sort y and keep track of original indices
+    sorted_indices = np.argsort(y)
+    y_sorted = y[sorted_indices]
+    original_indices = non_zero_indices[sorted_indices]
+
+    # Use the original indices to assign colors
+    scatter = ax.scatter(range(len(y_sorted)), y_sorted, s=100, c=color_map[original_indices], edgecolor='white', linewidth=0.5)
 
     ax.set_title("Miner Incentives", fontsize=20, pad=20)
     ax.set_xlabel("Miner", fontsize=14, labelpad=10)
@@ -82,7 +96,7 @@ def plot_incentive_over_time(
     ax.set_xticklabels(range(0, len(I), 50), rotation=45, ha='right')
     plt.tight_layout()
 
-    steps = min([len(df) for vali, df in SCORED_DFS.items()])
+    steps = min([len(df) for vali, df in scored_validator_dfs.items()])
     anim = FuncAnimation(fig, update, frames=steps, interval=200, blit=True)
     plt.close(fig)
     display(HTML(anim.to_jshtml()))
