@@ -77,7 +77,7 @@ def get_wandb_history(
 
 
 def filter_df_by_time(df, start_ts=None, end_ts=None, verbose=False):
-    """ """"
+    """ """
 
     if df.shape[0] == 0:
         return df

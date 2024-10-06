@@ -67,7 +67,7 @@ class BalancedF1Reward(Reward):
                 f1_flipped = metrics_flipped_10['f1_score']
                 correct = 1. if pred == true_label else 0.
 
-                reward = correct if new_miner else (f1 + f1_flipped) / 2.
+                reward = correct if is_new_miner else (f1 + f1_flipped) / 2.
                 
                 # Calculate and apply penalty
                 penalty = self.penalty(pred_prob, reward)
