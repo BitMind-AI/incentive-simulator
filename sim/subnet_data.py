@@ -4,6 +4,10 @@ import pandas as pd
 import wandb
 
 
+def formatted_ts_from_epoch(ts):
+    return datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%S')
+
+
 def get_wandb_history(
     project='bitmind-subnet',
     entity='bitmindai',
@@ -11,19 +15,35 @@ def get_wandb_history(
     running_only=False,
     start_ts=None,
     end_ts=None, 
-    verbosity=0):
+    verbosity=1):
 
-    api = wandb.Api()
-    validator_runs = api.runs(f"{entity}/{project}")
-
-    filters = None
-    if start_ts:
-        formatted_time = datetime.fromtimestamp(start_ts).strftime('%Y-%m-%dT%H:%M:%S')
-        filters = {"created_at": {"$gte": formatted_time}}
+    filters = {"display_name": validator_name}
+    if start_ts or end_ts:
+        filters["created_at"] = {
+            "$gte": formatted_ts_from_epoch(start_ts) if start_ts else None,
+            "$lte": formatted_ts_from_epoch(end_ts) if end_ts else None
+        }
 
     wandb_proj = f"{entity}/{project}"
-    print(f"Querying wandb probject {wandb_proj} with filters {filters}")
-    runs = api.runs(wandb_proj, filters=filters)
+    if verbosity > 0:
+        print(f"--- Querying {wandb_proj} for {validator_name} ---")
+        print(f"\tFilters:")
+        for f, v in filters.items():
+            print(f"\t\t{f} = {v}")
+
+    api = wandb.Api()
+    validator_runs = api.runs(wandb_proj, filters=filters)
+    if len(validator_runs) == 0:
+        if start_ts is None and end_ts is None:
+            return pd.DataFrame()  # base case
+
+        if verbosity > 0:
+            print("\tNo runs found with specified filters. Falling back to most recent run with the given name.")
+        all_history_df = get_wandb_history(project, entity, validator_name, running_only, None, None, verbosity)
+        return filter_df_by_time(all_history_df, start_ts, end_ts, verbosity > 1)
+
+    if verbosity > 0:
+        print(f"\tFound {len(validator_runs)} runs")
 
     all_history_df = pd.DataFrame()
     for run in validator_runs:
@@ -35,29 +55,47 @@ def get_wandb_history(
 
         history_df = run.history()
         if history_df.shape[0] == 0:
+            if verbosity > 1:
+                print(f"\tRun {run.id}: Empty history dataframe")
             continue
 
-        if start_ts is not None:
-            #history_df = history_df[history_df['_timestamp'] >= start_ts]
-            if run.summary['_timestamp'] < start_ts:
-                continue
-        if end_ts is not None:
-            #history_df = history_df[history_df['_timestamp'] <= end_ts]
-            if run.summary['_timestamp'] > end_ts:
-                continue
-
-        if history_df.shape[0] == 0:
-            continue
-
-        readable_time = datetime.fromtimestamp(run.summary['_timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"Loaded {history_df.shape[0]} challenges from {run.name} ({readable_time})")
+        run_timestamp = formatted_ts_from_epoch(run.summary['_timestamp'])
+        if verbosity > 0:
+            print(f"\tRun {run.id}: Loaded {history_df.shape[0]} challenges from {run.name} ({run_timestamp})")
 
         if 'miner_uids' in history_df.columns:
             history_df = history_df.rename({'miner_uids': 'miner_uid'}, axis=1)
         if 'predictions' in history_df.columns:
             history_df = history_df.rename({'predictions': 'pred'}, axis=1)
 
-        history_df = history_df[['_timestamp', 'miner_uid', 'pred', 'label']]
+        cols = ['_timestamp', 'miner_uid', 'pred', 'label']
+        if 'miner_hotkeys' in history_df.columns:
+            cols.append('miner_hotkeys')
 
-        all_history_df = pd.concat([all_history_df, history_df], axis=0)
+        all_history_df = pd.concat([all_history_df, history_df[cols]], axis=0)
     return all_history_df
+
+
+def filter_df_by_time(df, start_ts=None, end_ts=None, verbose=False):
+    """ """"
+
+    if df.shape[0] == 0:
+        return df
+
+    if start_ts is not None:
+        rows_before = df.shape[0]
+        df = df[df['_timestamp'] >= start_ts]
+        rows_after = df.shape[0]
+        diff = rows_before - rows_after
+        if verbose and diff > 0:
+            print(f"\t\tDropped {diff} rows from before {formatted_ts_from_epoch(start_ts)} ({rows_after} remaining)")
+
+    if end_ts is not None:
+        rows_before = df.shape[0]
+        df = df[df['_timestamp'] <= end_ts]
+        rows_after = df.shape[0]
+        diff = rows_before - df.shape[0]
+        if verbose and diff > 0:
+            print(f"\t\tDropped {diff} rows from after {formatted_ts_from_epoch(end_ts)} ({rows_after} remaining)")
+
+    return df
