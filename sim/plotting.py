@@ -16,7 +16,8 @@ def plot_incentive_over_time(
     scored_validator_dfs,
     validator_uids,
     reward_column='weights_BinaryReward',
-    netuid=34):
+    netuid=34,
+    highlight_uids=[]):
     """
     TODO option to have a fixed xlim and ylim
     TODO option to overlay multiple incentives over time
@@ -46,9 +47,15 @@ def plot_incentive_over_time(
         
         sorted_pairs = sorted(zip(I, range(len(I))))
         y_sorted, sorted_indices = zip(*sorted_pairs)
-        
+
+        #color_map = np.array([[0.0, 1.0, 1.0, 1.0]] * 256) 
+        color_map = np.array([[0.8, 0.8, 0.8, 1.0]] * 256) 
+        for uid in highlight_uids:
+            color_map[sorted_indices.index(uid)] = highlight_color_map[uid]
+
         scatter.set_offsets(np.column_stack((range(len(y_sorted)), y_sorted)))
-        scatter.set_color(color_map[np.array(sorted_indices)])
+        scatter.set_color(color_map)
+
         ax.set_ylim(0, max(I) * 1.1)
         ax.set_xlim(-5, len(y_sorted) + 5)
         ax.set_xticks(range(0, len(y_sorted) + 1, 50))
@@ -69,13 +76,21 @@ def plot_incentive_over_time(
         reward_column,
         metagraph)
 
-    color_map = plt.cm.viridis(np.linspace(0, 1, 256))
 
     sorted_pairs = sorted(zip(I, range(len(I))))
     y_sorted, sorted_indices = zip(*sorted_pairs)
-    print(len(y_sorted), len(sorted_indices))
-    print(len(color_map))
-    scatter = ax.scatter(range(256), y_sorted, c=color_map[np.array(sorted_indices)], s=50)
+
+    color_map = np.array([[0.8, 0.8, 0.8, 1.0]] * 256) 
+    highlight_color_map = {
+        uid: c for uid, c in zip(
+            highlight_uids, 
+            plt.cm.viridis(np.linspace(0, 1, len(highlight_uids)))
+        )
+    }
+    for uid in highlight_uids:
+        color_map[sorted_indices.index(uid)] = highlight_color_map[uid]
+
+    scatter = ax.scatter(range(256), y_sorted, c=color_map, s=50)
     
     ax.set_title("Miner Incentives", fontsize=20, pad=20)
     ax.set_xlabel("Miner", fontsize=14, labelpad=10)
