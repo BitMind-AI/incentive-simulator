@@ -63,11 +63,14 @@ class BalancedF1Reward(Reward):
                 metrics_10 = self.performance_tracker.get_metrics(uid, window=10)
                 metrics_flipped_10 = self.performance_tracker.get_metrics(uid, window=10, flip=True)
 
+                metrics_100 = self.performance_tracker.get_metrics(uid, window=100)
+                metrics_flipped_100 = self.performance_tracker.get_metrics(uid, window=100, flip=True)
+
                 f1 = metrics_10['f1_score']
                 f1_flipped = metrics_flipped_10['f1_score']
                 correct = 1. if pred == true_label else 0.
 
-                reward = correct if is_new_miner else (f1 + f1_flipped) / 2.
+                reward = (f1 + f1_flipped) / 2.
                 
                 # Calculate and apply penalty
                 penalty = self.penalty(pred_prob, reward)
