@@ -1,6 +1,7 @@
 from matplotlib.animation import FuncAnimation
 from IPython.display import HTML, display
 from matplotlib.colors import to_rgba
+from tqdm.auto import tqdm
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -15,7 +16,7 @@ from sim.incentive import assemble_W, assemble_S, compute_incentive
 def plot_incentive_over_time(
     scored_validator_dfs,
     validator_uids,
-    reward_column='weights_BinaryReward',
+    weight_column='weights_BinaryReward',
     netuid=34,
     highlight_uids=[]):
     """
@@ -27,14 +28,14 @@ def plot_incentive_over_time(
         timestep,
         validator_dfs,
         validator_uids,
-        reward_column,
+        weight_column,
         metagraph=None):
         """
         TODO log stake to w&b for dynamic stake values instead
         of relying on current metagraph
         """
         S = assemble_S(validator_uids, metagraph=metagraph)
-        W = assemble_W(validator_dfs, reward_column, idx=timestep)
+        W = assemble_W(validator_dfs, weight_column, idx=timestep)
         return compute_incentive(W, S)
 
     def update(frame):
@@ -42,7 +43,7 @@ def plot_incentive_over_time(
             frame,
             scored_validator_dfs,
             validator_uids,
-            reward_column,
+            weight_column,
             metagraph)
         
         sorted_pairs = sorted(zip(I, range(len(I))))
@@ -61,6 +62,7 @@ def plot_incentive_over_time(
         ax.set_xticks(range(0, len(y_sorted) + 1, 50))
         ax.set_xticklabels(range(0, len(y_sorted), 50), rotation=45, ha='right')
         ax.set_title(f"Miner Incentives (Timestep: {frame})", fontsize=20, pad=20)
+        progress_bar.update(1)
         return scatter,
 
     fig, ax = plt.subplots(figsize=(12, 8))
@@ -73,7 +75,7 @@ def plot_incentive_over_time(
         0,
         scored_validator_dfs,
         validator_uids,
-        reward_column,
+        weight_column,
         metagraph)
 
 
@@ -102,10 +104,14 @@ def plot_incentive_over_time(
     plt.tight_layout()
 
     steps = min([len(df) for vali, df in scored_validator_dfs.items()])
-    anim = FuncAnimation(fig, update, frames=steps, interval=200, blit=True)
-    plt.close(fig)
-    display(HTML(anim.to_jshtml()))
+    progress_bar = tqdm(total=steps, desc="Generating Animation")
+    try:
+        anim = FuncAnimation(fig, update, frames=steps, interval=200, blit=True)
+        plt.close(fig)
+    finally:
+        progress_bar.close()  # Ensure the progress bar is closed after completion
 
+    display(HTML(anim.to_jshtml()))
 
 def plot_incentives(I_dict):
 
