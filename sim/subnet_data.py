@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from collections import defaultdict
 from datetime import datetime
 import pandas as pd
@@ -99,3 +100,79 @@ def filter_df_by_time(df, start_ts=None, end_ts=None, verbose=False):
             print(f"\t\tDropped {diff} rows from after {formatted_ts_from_epoch(end_ts)} ({rows_after} remaining)")
 
     return df
+
+
+def epoch_to_datetime(epoch):
+    return datetime.utcfromtimestamp(epoch)
+
+
+def datetime_to_epoch(dt):
+    return int(dt.timestamp())
+
+
+def round_timestamp(timestamp, round_to_minutes=1):
+    rounded = timestamp.replace(second=0, microsecond=0)
+    if round_to_minutes > 1:
+        minutes = (rounded.minute // round_to_minutes) * round_to_minutes
+        rounded = rounded.replace(minute=minutes)
+    return rounded
+
+
+def align_dataframes_by_timestamp(data_dict, timestamp_column='_timestamp', round_to_minutes=1):
+    """
+    Aligns dataframes in the data_dict by their epoch timestamp column, with configurable rounding.
+    Ensures all dataframes have the same start and end times, and all rows align perfectly.
+    Fills missing data with the most recently available data.
+    
+    :param data_dict: Dictionary of dataframes
+    :param timestamp_column: Name of the timestamp column (containing epoch timestamps)
+    :param round_to_minutes: Number of minutes to round timestamps to (1, 5, 10, etc.)
+    :return: Dictionary of aligned dataframes
+    """
+    aligned_dict = {}
+    all_timestamps = set()
+    
+    # First pass: round timestamps and collect all unique timestamps
+    for key, df in data_dict.items():
+        df = df.copy()
+        df['_datetime'] = df[timestamp_column].apply(lambda x: round_timestamp(epoch_to_datetime(x), round_to_minutes))
+        df['aligned_timestamp'] = df['_datetime'].apply(datetime_to_epoch)
+        df = df.sort_values('aligned_timestamp')
+        aligned_dict[key] = df
+        all_timestamps.update(df['aligned_timestamp'])
+    
+    # Determine the common start and end times
+    common_start = max(df['aligned_timestamp'].min() for df in aligned_dict.values())
+    common_end = min(df['aligned_timestamp'].max() for df in aligned_dict.values())
+    
+    # Create a complete timestamp index within the common range
+    all_timestamps = sorted([t for t in all_timestamps if common_start <= t <= common_end])
+    timestamp_index = pd.Index(all_timestamps, name='aligned_timestamp')
+    
+    # Second pass: reindex all dataframes to the common timestamp index and fill missing data
+    for key, df in aligned_dict.items():
+        # Reindex the dataframe
+        df_reindexed = df.set_index('aligned_timestamp').reindex(timestamp_index)
+        
+        # Fill missing data with the most recently available data
+        df_filled = df_reindexed.ffill()
+        
+        # Add the 'data_available' column to indicate original vs filled data
+        df_filled['data_available'] = df_filled.index.isin(df['aligned_timestamp']).astype(int)
+        
+        # Reset the index to make 'aligned_timestamp' a column again
+        df_filled = df_filled.reset_index()
+        
+        # Add readable datetime column
+        df_filled['_datetime'] = df_filled['aligned_timestamp'].apply(lambda x: epoch_to_datetime(x).strftime('%Y-%m-%d %H:%M:%S'))
+        
+        # Reorder columns
+        cols = df_filled.columns.tolist()
+        cols = ['aligned_timestamp', '_datetime', 'data_available'] + [col for col in cols if col not in ['aligned_timestamp', '_datetime', 'data_available', '_datetime']]
+        df_filled = df_filled[cols]
+        
+        aligned_dict[key] = df_filled
+    
+    print(f"All dataframes aligned to time range: {epoch_to_datetime(common_start)} - {epoch_to_datetime(common_end)}")
+    
+    return aligned_dict
