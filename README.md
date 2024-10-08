@@ -11,4 +11,4 @@ The goal is to generalize this repository to facilitate arbitrary validation mec
 Currently, `simulation.ipynb`...
 - Loads and processes historical validator data from Weights & Biases (W&B) or local cache
 - Parallelizes the cross product of validators x reward functions across available CPUs
-- Has functionality to compute and plot rewards, scores, weights and incentives at different timesteps
+- Computes and plots rewards, scores, weights and incentives at different timesteps
