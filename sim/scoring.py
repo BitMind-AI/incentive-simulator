@@ -44,5 +44,6 @@ def update_scores(scores, rewards: np.ndarray, uids: List[int]):
 
     # Update scores with rewards produced by this step.
     # shape: [ metagraph.n ]
-    alpha: float = .1
+    alpha: float = .02
     return alpha * scattered_rewards + (1 - alpha) * scores
+    #return scattered_rewards / len(scattered_rewards)
