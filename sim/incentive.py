@@ -8,9 +8,30 @@ def compute_incentive(W, S):
     return incentive
 
 
-def assemble_W(data_dict, W_column, N=256, idx=-1):
+def compute_all_incentives(
+    weight_history_dfs, 
+    weight_column, 
+    n_timesteps=None, 
+    netuid=34, 
+    metagraph=None):
+    """  """
+    
+    I = []
+    if n_timesteps is None:
+        n_timesteps = min([len(df) for _, df in weight_history_dfs.items()])
+    
+    vali_uids = np.array([int(vali.split('-')[1]) for vali in weight_history_dfs.keys()])
+    S = assemble_S(vali_uids, netuid, metagraph)
+    for timestep in range(n_timesteps):
+        W = assemble_W(weight_history_dfs, weight_column, idx=timestep)
+        I.append(compute_incentive(W, S))
+        
+    return np.array(I)
+    
+
+def assemble_W(weight_history_dfs, W_column, N=256, idx=-1):
     W = []
-    for vali, df in data_dict.items():
+    for vali, df in weight_history_dfs.items():
         weight_dict = df[W_column].iloc[idx]
         uids = list(weight_dict.keys())
         W_ = np.zeros(N)
@@ -23,4 +44,5 @@ def assemble_S(vali_uids, netuid=34, metagraph=None):
     if not metagraph:
         metagraph = bt.metagraph(netuid=netuid)
     return metagraph.S[vali_uids]
+
     

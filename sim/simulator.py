@@ -7,6 +7,8 @@ import bittensor as bt
 import pandas as pd
 import numpy as np
 import itertools
+import psutil
+import os
 
 from .rewards import REWARD_REGISTRY, Reward
 from .scoring import update_scores   
@@ -18,46 +20,53 @@ def _simulation_fn(reward_data_tup: Tuple[Tuple[str, pd.DataFrame], Reward]):
     Helper function for parallelizing simulations
     """
     print()  # to force progress bars to show up in notebook
-    reward_fn = reward_data_tup[1]
+    reward_cls = reward_data_tup[1]
     history_df = reward_data_tup[0][1]
     vali_name = reward_data_tup[0][0]
     history_df.name = vali_name
-    sim = Simulator(reward_fn)
-    return sim.run(history_df)
+    sim = Simulator(reward_cls)
+    return vali_name, reward_cls, sim.run(history_df)
 
 
+def worker(reward_data_tup):
+    # Set CPU affinity
+    process = psutil.Process()
+    cpu_id = os.getpid() % psutil.cpu_count(logical=True)
+    process.cpu_affinity([cpu_id])
+    
+    # Set nice value (lower value = higher priority, be careful with negative values)
+    os.nice(10)  # slightly lower priority than default
+    return _simulation_fn(reward_data_tup)
+
+    
 def run_simulations(
-    history_dfs: Dict[str, pd.DataFrame], reward_cls_list: List[str]=['BinaryReward', 'WeightedHistoryReward']):
+    history_dfs: Dict[str, pd.DataFrame], 
+    reward_cls_list: List[str]=['BinaryReward', 'WeightedHistoryReward']
+) -> Dict[str, pd.DataFrame]:
     """
-    Parallelize simulations
+    Parallelize simulations with optimized resource allocation
     """
-
-    vali_df_tuples = [(vali, df.copy()) for vali, df in history_dfs.items()] 
+    vali_df_tuples = [(vali, df.copy()) for vali, df in history_dfs.items()]
     vali_reward_combos = list(itertools.product(vali_df_tuples, reward_cls_list))
+    n_cpu = psutil.cpu_count(logical=True)
 
-    n_cpu = mp.cpu_count()
     print(f"Parallelizing {len(vali_reward_combos)} simulations over {n_cpu} cpus")
+    with mp.get_context("spawn").Pool(n_cpu) as pool:
+        result_tuples = list(pool.imap_unordered(worker, vali_reward_combos))
 
-    with mp.Pool(n_cpu) as pool:
-        result_dfs = pool.map(
-            _simulation_fn,
-            vali_reward_combos)
-
-    for sim_args, result_df in zip(vali_reward_combos, result_dfs):
-        vali = sim_args[0][0]
-        reward_cls = sim_args[1]
-        cols = [
-            '_'.join([col, reward_cls])
-            for col  in ['rewards', 'scores', 'weights']
-        ]
+    for vali, reward_cls, result_df in result_tuples:
+        cols = ['_'.join([col, reward_cls]) for col in ['rewards', 'scores', 'weights']]
         history_dfs[vali][cols] = result_df[cols]
+    
     return history_dfs
 
 
 class Simulator:
 
-    def __init__(self, reward):
+    def __init__(self, reward, metagraph=None, subtensor=None):
         self.reward = REWARD_REGISTRY[reward]()
+        self.metagraph = bt.metagraph(netuid=34) if metagraph is None else metagraph
+        self.subtensor = bt.subtensor() if subtensor is None else subtensor
 
     def run(self, history_df: pd.DataFrame):
         """
@@ -74,8 +83,6 @@ class Simulator:
             Note: if limit is < len(history_df), the first `limit` rows will contain rewards and scores, and 
             the rest will be nan.
         """
-        metagraph = bt.metagraph(netuid=34)
-        subtensor = bt.subtensor()
         scores = np.zeros(256, dtype=np.float32) 
         history = {
             'weights': [],
@@ -105,7 +112,7 @@ class Simulator:
             scores = update_scores(scores, rewards, uids)
             history['scores'].append(scores)
 
-            new_weight_uids, new_weights = set_weights(scores, metagraph, subtensor)
+            new_weight_uids, new_weights = set_weights(scores, self.metagraph, self.subtensor)
             weight_dict = dict(zip(new_weight_uids, new_weights))
             history['weights'].append(weight_dict)
 

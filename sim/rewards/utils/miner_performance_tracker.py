@@ -36,7 +36,7 @@ class MinerPerformanceTracker:
         self.prediction_history[uid].append(prediction)
         self.label_history[uid].append(label)
 
-    def get_metrics(self, uid: int, window: int = None):
+    def get_metrics(self, uid: int, window: int = None, flip=False):
         """
         Get the performance metrics for a miner based on their last n predictions
 
@@ -66,6 +66,10 @@ class MinerPerformanceTracker:
 
         if len(labels) == 0 or len(predictions) == 0:
             return self._empty_metrics()
+
+        if flip:
+            labels = [1 - v for v in labels]
+            predictions = [1 - v for v in predictions]
 
         try:
             accuracy = accuracy_score(labels, predictions)

@@ -2,6 +2,10 @@ from collections import defaultdict
 import numpy as np
 import math
 
+from .base_reward import Reward
+from .reward_registry import REWARD_REGISTRY
+
+
 GLICKO_MAX = 7000
 GLICKO_MIN = 0
 
@@ -11,7 +15,8 @@ DEFAULT_VOLATILITY = 0.06
 TAU = 0.5
 
 
-class GlickoRater:
+@REWARD_REGISTRY.register_module(module_name='GlickoReward')
+class GlickoReward(Reward):
 
     def __init__(
         self,
@@ -21,12 +26,13 @@ class GlickoRater:
         tau: float = TAU,
         N: int = 256
     ):
+        super().__init__("GlickoReward")
         self.ratings = {uid: initial_rating for uid in range(0, N+1)}
         self.rd = {uid: initial_rd for uid in range(0, N+1)}
         self.volatility = {uid: initial_volatility for uid in range(0, N+1)}
         self.tau = tau
 
-    def update_ratings(self, uids, preds, label):
+    def __call__(self, uids, preds, label):
         """
         Update Glicko ratings for multiple players based on individual performance outcomes.
         
