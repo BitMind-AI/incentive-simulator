@@ -17,7 +17,7 @@ from sim.incentive import assemble_W, assemble_S, compute_incentive
 def animate_timeseries(
     X, 
     highlight_uids=[], 
-    fixed_axes=True,
+    dynamic_y_interval=50,
     figsize=(12, 8)):
     """
     """
@@ -34,8 +34,17 @@ def animate_timeseries(
             color_map[sorted_indices.index(uid)] = highlight_color_map[uid]
         scatter.set_offsets(np.column_stack((range(len(y)), y)))
         scatter.set_color(color_map)
-        if not fixed_axes:
-            ax.set_ylim(y_min, max(y) * 1.1)
+        if dynamic_y_interval:
+            offset = dynamic_y_interval // 2
+            start = frame - offset
+            end = frame + offset
+            if start < 0:
+                end -= start
+                start = 0
+            if end > len(X):
+                end = len(X)
+                start -= end - len(X)
+            ax.set_ylim(y_min, np.max(X[start: end]) * 1.1)
         ax.set_title(f"Miner Incentives (Timestep: {frame})", fontsize=20, pad=20)
         return scatter,
 
@@ -56,10 +65,11 @@ def animate_timeseries(
     scatter = ax.scatter(range(len(y)), y, c=color_map, s=50)
 
     y_min = 0 - np.min(np.nonzero(X)) * 0.9
-    if fixed_axes:
-        y_max = np.max(X) * 1.1
+    y_max = np.max(X) * 1.1
+    if dynamic_y_interval:
+         y_max = np.max(X[:dynamic_y_interval]) * 1.1
 
-    ax.set_ylim(y_min, y_max if fixed_axes else max(y) * 1.1)
+    ax.set_ylim(y_min, y_max)
     ax.set_xlim(-5, len(y) + 5)
     ax.set_xticks(range(0, len(y) + 1, 50))
     ax.set_xticklabels(range(0, len(y), 50), rotation=45, ha='right')
@@ -71,6 +81,33 @@ def animate_timeseries(
     anim = FuncAnimation(fig, update, frames=len(X), interval=200, blit=True)
     plt.close(fig)
     display(HTML(anim.to_jshtml()))
+
+
+def plot_rolling_std(data, window_size, column_indices):
+    """
+    Compute and plot rolling standard deviations of values in specified columns over time.
+
+    Parameters:
+    - data: 2D numpy array with rows representing time and columns representing model accuracies
+    - window_size: Size of the rolling window
+    - column_indices: List of column indices to plot
+
+    Returns:
+    - fig, ax: matplotlib figure and axes objects
+    """
+
+    rolling_std = np.array([np.std(data[i:i+window_size], axis=0) for i in range(len(data)-window_size+1)])
+    time_axis = np.arange(window_size - 1, len(data))
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for idx in column_indices:
+        ax.plot(time_axis, rolling_std[:, idx], label=f'uid {idx}')
+
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Rolling Standard Deviation')
+    ax.set_title(f'Rolling Standard Deviation Over Time (Window Size: {window_size})')
+    ax.legend()
+    ax.grid(True)
+    return fig, ax
 
 
 def plot_incentive_over_time(
