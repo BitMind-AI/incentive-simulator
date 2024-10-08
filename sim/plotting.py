@@ -1,4 +1,5 @@
 from matplotlib.animation import FuncAnimation
+import matplotlib.animation as animation
 from IPython.display import HTML, display
 from matplotlib.colors import to_rgba
 from tqdm.auto import tqdm
@@ -11,6 +12,65 @@ import numpy as np
 import colorsys
 
 from sim.incentive import assemble_W, assemble_S, compute_incentive
+
+
+def animate_timeseries(
+    X, 
+    highlight_uids=[], 
+    fixed_axes=True,
+    figsize=(12, 8)):
+    """
+    """
+    def get_timestep(frame):
+        x = X[frame]
+        sorted_pairs = sorted(zip(x, range(len(x))))
+        y_sorted, sorted_indices = zip(*sorted_pairs)
+        return y_sorted, sorted_indices
+
+    def update(frame):
+        color_map = np.array([[0.8, 0.8, 0.8, 1.0]] * 256) 
+        y, sorted_indices = get_timestep(frame)
+        for uid in highlight_uids:
+            color_map[sorted_indices.index(uid)] = highlight_color_map[uid]
+        scatter.set_offsets(np.column_stack((range(len(y)), y)))
+        scatter.set_color(color_map)
+        if not fixed_axes:
+            ax.set_ylim(y_min, max(y) * 1.1)
+        ax.set_title(f"Miner Incentives (Timestep: {frame})", fontsize=20, pad=20)
+        return scatter,
+
+    highlight_color_map = {
+        uid: c for uid, c in zip(
+            highlight_uids, 
+            plt.cm.viridis(np.linspace(0, 1, len(highlight_uids)))
+        )
+    }
+
+    sns.set_style("whitegrid")
+    fig, ax = plt.subplots(figsize=figsize)
+
+    y, sorted_indices = get_timestep(0)
+    color_map = np.array([[0.8, 0.8, 0.8, 1.0]] * 256) 
+    for uid in highlight_uids:
+        color_map[sorted_indices.index(uid)] = highlight_color_map[uid]
+    scatter = ax.scatter(range(len(y)), y, c=color_map, s=50)
+
+    y_min = 0 - np.min(np.nonzero(X)) * 0.9
+    if fixed_axes:
+        y_max = np.max(X) * 1.1
+
+    ax.set_ylim(y_min, y_max if fixed_axes else max(y) * 1.1)
+    ax.set_xlim(-5, len(y) + 5)
+    ax.set_xticks(range(0, len(y) + 1, 50))
+    ax.set_xticklabels(range(0, len(y), 50), rotation=45, ha='right')
+    ax.set_title("Miner Incentives (Timestep: 0)", fontsize=20, pad=20)
+
+    plt.tight_layout()
+    fig.subplots_adjust(top=0.85)
+
+    anim = FuncAnimation(fig, update, frames=len(X), interval=200, blit=True)
+    plt.close(fig)
+    display(HTML(anim.to_jshtml()))
 
 
 def plot_incentive_over_time(
