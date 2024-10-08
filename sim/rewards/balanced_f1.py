@@ -18,7 +18,7 @@ class BalancedF1Reward(Reward):
     def penalty(self, y_pred: float, historical_performance: float) -> float:
         # Penalize if prediction is not within [0, 1]
         bad = (y_pred < 0.0) or (y_pred > 1.0)
-        low_accuracy = historical_performance < 0.60
+        low_accuracy = historical_performance < 0.50
         return 0.0 if bad or low_accuracy else 1.0
 
     def __call__(
@@ -59,20 +59,14 @@ class BalancedF1Reward(Reward):
                 # Update miner's performance history
                 self.performance_tracker.update(uid, pred, true_label, miner_hotkey)
                 
-                is_new_miner = self.performance_tracker.get_prediction_count(uid) < 10
-                metrics_10 = self.performance_tracker.get_metrics(uid, window=10)
-                metrics_flipped_10 = self.performance_tracker.get_metrics(uid, window=10, flip=True)
+                #is_new_miner = self.performance_tracker.get_prediction_count(uid) < 10
+                metrics = self.performance_tracker.get_metrics(uid, window=10)
+                metrics_flipped = self.performance_tracker.get_metrics(uid, window=10, flip=True)
 
-                metrics_100 = self.performance_tracker.get_metrics(uid, window=100)
-                metrics_flipped_100 = self.performance_tracker.get_metrics(uid, window=100, flip=True)
-
-                f1 = metrics_10['f1_score']
-                f1_flipped = metrics_flipped_10['f1_score']
-                correct = 1. if pred == true_label else 0.
-
+                f1 = metrics['f1_score']
+                f1_flipped = metrics_flipped['f1_score']
                 reward = (f1 + f1_flipped) / 2.
                 
-                # Calculate and apply penalty
                 penalty = self.penalty(pred_prob, reward)
                 reward *= penalty
 
